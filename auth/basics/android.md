@@ -5,6 +5,7 @@ description: User sign up, login, logout / access token / username, email and pa
 
 [[toc]]
 
+## Overview
 Skygear support user authentication with email or username. The following
 shows how it works using Skygear SDK.
 
@@ -12,6 +13,10 @@ The global `Container` named `skygear` will be used throughout the examples:
 ```java
 Container skygear = Container.defaultContainer(this); // Global Container
 ```
+
+Each user, when logged in, will be given a generated String called `Access Token`, which is like a identification card for the user. It is used by the Skygear server to identify who are you.
+
+Example of usage of `Access Token` is the method `whoami`, which will send the current `Access Token` to the server to return a `User` object.
 
 ## Signing up / Logging in / Logging out
 
@@ -58,15 +63,34 @@ skygear.signupWithEmail(email, password, new AuthResponseHandler() {
     }
 });
 ```
+However, if user try to sign up with an exsisting username / email, the error `ERROR.CODE.DUPLICATED` will be returned in the `onAuthFail` method.
+
+A typical account checking example is shown below:
+```java
+skygear.signupWithUsername(username, password, new AuthResponseHandler() {
+    @Override
+    public void onAuthSuccess(User user) {
+        Log.i("Skygear Signup", "onAuthSuccess: Got token: " + user.accessToken);
+    }
+
+    @Override
+    public void onAuthFail(Error error) {
+        if(error.getCode().equals(Error.Code.DUPLICATED)){
+            Toast.makeText(getApplicationContext(), "User already exist!", Toast.LENGTH_SHORT).show();
+            //Duplicate user handling...
+        }
+    }
+});
+```
 
 ### Anonymous user
 
-Skygear support users to sign up anonymously. However, they can only read data from the public database, but cannot perform operations such as saving data.
+Skygear supports users to sign up anonymously. They act like normal users and can read and update records.
 
 To create an anonymous user, call `skygear.signupAnonymously()` as shown below:
 
 ```java
-skygear.signupAninymously(new AuthResponseHandler() {
+skygear.signupAnonymously(new AuthResponseHandler() {
     @Override
     public void onAuthSuccess(User user) {
         Log.i("Skygear Signup", "onAuthSuccess: Got token: " + user.accessToken);
@@ -81,13 +105,11 @@ skygear.signupAninymously(new AuthResponseHandler() {
 
 Each anonymous user has a unique ID that behaves exactly the same way as normal. As expected, an anonymous user does not have username, email nor password.
 
-Because of this behaviour, once the token of an anonymous user is lost, so will the account.
+Because of this behaviour, once the token of an anonymous user is lost, the account will not be able to access again. The records, however, will still persist.
 
 ### Logging in
 
 Logging in behave much the same way as signing up a user.
-
-However, if user try to sign up with an exsisting username / email, the error `ERROR.CODE.DUPLICATED` will be returned in the `onAuthFail` method, indicating the username / email is already registered.
 
 The following shows how to log in a user with username and password.
 
@@ -183,15 +205,15 @@ skygear.whoami(new AuthResponseHandler() {
 
 To change a user's username and email, you can use the `skygear.saveUser()` method by providing the user ID and the new username and/or the new email.
 
-Every user can only edit his/her information
-While only users with admin privilege can change information of other users.
+Each user can only edit his/her information
+While only users with the admin role can change information of other users.
 
 To change the username/email of the current user:
 ```java
 User currentUser = skygear.getCurrentUser();
 
-User newUser = new User(currentUser.userId, 
-                        currentUser.accessToken, 
+User newUser = new User(currentUser.getId(), 
+                        currentUser.getAccessToken(), 
                         "your-new-username",
                         "your-new-email@hello.com"); 
                         
@@ -207,6 +229,8 @@ skygear.saveUser(newUser, new UserSaveResponseHandler() {
     }
 });
 ```
+
+If you only want to change one of the user field, just replace the new username/email with `currentUser.getUsername()`/`currentUser.getEmail()`
 
 ### Change the password of a user
 Coming Soon
