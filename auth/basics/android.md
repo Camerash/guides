@@ -6,27 +6,37 @@ description: User sign up, login, logout / access token / username, email and pa
 [[toc]]
 
 ## Overview
-Skygear support user authentication with email or username. The following
-shows how it works using Skygear SDK.
 
-The global `Container` named `skygear` will be used throughout the examples:
+Skygear supports user authentication with email or username. This guide will show you how it works using the Skygear Android SDK.
+
+The global `Container` named `skygear` will be used throughout the examples in this guide:
 ```java
 Container skygear = Container.defaultContainer(this); // Global Container
 ```
 
-Each user, when logged in, will be given a generated String called `Access Token`, which is like a identification card for the user. It is used by the Skygear server to identify who are you.
+**Some basic concepts**
 
-Example of usage of `Access Token` is the method `whoami`, which will send the current `Access Token` to the server to return a `User` object.
+### Access token
 
-## Signing up / Logging in / Logging out
+Skygear handles the user login session using an access token stored in the local storage.
 
-### Signing up
+Each user, when logged in, will be given a generated String called `Access Token`, which is like a identification card for the user. It is used by the Skygear server to identify who you are.
 
-A user can sign up using:
-1. Username
-2. Email
+The method `whoami` illustrates the usage of `Access Token`. When it is called, Skygear will send the current `Access Token` to the server and the server will return a `User` object.
 
-The following shows how to sign up a user with username and password.
+### Database operation
+
+The authenticated states of a user will affect the database operation he can perform.
+
+Records in the public database can be queried without any user session. But if you want to write and/or update any records, a user session is required.
+
+## Signing up
+
+There are 2 APIs you can use to sign up a user:
+1. `signupWithUsername`: signing up with a username and a password
+2. `signupWithEmail`: signing up with an email and a password
+
+The following example shows how to sign up a user with username and password.
 
 ```java
 String username = getUsername(); // get from user input
@@ -63,9 +73,11 @@ skygear.signupWithEmail(email, password, new AuthResponseHandler() {
     }
 });
 ```
-However, if user try to sign up with an exsisting username / email, the error `ERROR.CODE.DUPLICATED` will be returned in the `onAuthFail` method.
 
-A typical account checking example is shown below:
+If a user try to sign up with an existing username / email, the error `ERROR.CODE.DUPLICATED` will be returned in the `onAuthFail` method.
+
+A typical way to check if a user account already exists is shown below:
+
 ```java
 skygear.signupWithUsername(username, password, new AuthResponseHandler() {
     @Override
@@ -83,9 +95,13 @@ skygear.signupWithUsername(username, password, new AuthResponseHandler() {
 });
 ```
 
-### Anonymous user
+## Anonymous user
 
-Skygear supports users to sign up anonymously. They act like normal users and can read and update records.
+As mentioned before, to write and/or update a record in the Skygear database, there must be a user session.
+
+However, if your app dose not require a user to sign up explicitly, how can you write records to the cloud database from your app then?
+
+In this case you can create a anonymous user session. An anonymous user acts like a normal user - he can write, read and update the records.
 
 To create an anonymous user, call `skygear.signupAnonymously()` as shown below:
 
@@ -105,11 +121,16 @@ skygear.signupAnonymously(new AuthResponseHandler() {
 
 Each anonymous user has a unique ID that behaves exactly the same way as normal. As expected, an anonymous user does not have username, email nor password.
 
-Because of this behaviour, once the token of an anonymous user is lost, the account will not be able to access again. The records, however, will still persist.
+Because of this behavior, once the token of an anonymous user is lost, the account will not be able to access again. The records, however, will still persist.
 
-### Logging in
+## Logging in
 
-Logging in behave much the same way as signing up a user.
+Logging in behaves the same way as signing up a user.
+
+Depending whether they sign up with email or username, you can log a user in with:
+
+- loginWithUsername
+- loginWithEmail
 
 The following shows how to log in a user with username and password.
 
@@ -136,7 +157,7 @@ Users can log in with their emails if they have registered:
 String email = getEmail(); // get from user input
 String password = getPassword(); // get from user input
 
-skygear.loginWithUsername(email, password, new AuthResponseHandler() {
+skygear.loginWithEmail(email, password, new AuthResponseHandler() {
     @Override
     public void onAuthSuccess(User user) {
         Log.i("Skygear Login", "onAuthSuccess: Got token: " + user.accessToken);
@@ -149,7 +170,7 @@ skygear.loginWithUsername(email, password, new AuthResponseHandler() {
 });
 ```
 
-### Logging out
+## Logging out
 To logout from the current user, simply call `skygear.logout()` as shown below:
 
 ```java
@@ -163,13 +184,13 @@ skygear.logout(new LogoutResponseHandler() {
    public void onLogoutFail(Error error) {
         Log.i("Skygear Logout", "onLogoutFail: Fail with reason:" + error.getMessage());
    }
-  
+
 });
 ```
 
 ## Getting the current User
 
-After sign up / log in, the user session can be obtained by:
+After sign up / log in, the user session can be obtained with `getCurrentUser`.
 
 ```java
 User currentUser = skygear.getCurrentUser(); // Return null if not logged in
@@ -179,7 +200,7 @@ Log.i("Skygear User", "User ID: " + currentUser.userId);
 Log.i("Skygear User", "Username: " + currentUser.username);
 ```
 
-Please be reminded that the `currentUser` object persist locally, and the
+Please be reminded that the `currentUser` object persists locally, and the
 information (e.g. roles, emails, etc) might not sync with the server if it was
 changed remotely.
 
@@ -199,24 +220,22 @@ skygear.whoami(new AuthResponseHandler() {
 });
 ```
 
-## Changing username/email/password
-
-### Change the username / email of a user
+## Updating the username / email of a user
 
 To change a user's username and email, you can use the `skygear.saveUser()` method by providing the user ID and the new username and/or the new email.
 
-Each user can only edit his/her information
-While only users with the admin role can change information of other users.
+Each user can only edit his/her information. Only users with the admin role can change information of other users.
 
-To change the username/email of the current user:
+This is how you can update the username/email of the current user:
+
 ```java
 User currentUser = skygear.getCurrentUser();
 
-User newUser = new User(currentUser.getId(), 
-                        currentUser.getAccessToken(), 
+User newUser = new User(currentUser.getId(),
+                        currentUser.getAccessToken(),
                         "your-new-username",
-                        "your-new-email@hello.com"); 
-                        
+                        "your-new-email@hello.com");
+
 skygear.saveUser(newUser, new UserSaveResponseHandler() {
     @Override
     public void onSaveSuccess(User user) {
@@ -230,9 +249,9 @@ skygear.saveUser(newUser, new UserSaveResponseHandler() {
 });
 ```
 
-If you only want to change one of the user field, just replace the new username/email with `currentUser.getUsername()`/`currentUser.getEmail()`
+If you only want to change one of the user fields, just replace the new username/email with `currentUser.getUsername()`/`currentUser.getEmail()`.
 
-### Change the password of a user
+## Updating the password of a user
 Coming Soon
 
 ## What's next from here?
